@@ -1,0 +1,115 @@
+/* Custom styles for SmartCart */
+
+/* Persona Traits */
+.persona-trait {
+    @apply bg-indigo-100 text-indigo-800 px-3 py-1 rounded-full text-sm;
+}
+
+/* Mood Selector */
+.mood-btn {
+    @apply text-2xl p-2 rounded-full transition-all duration-200;
+}
+
+.mood-btn:hover {
+    @apply bg-gray-200;
+}
+
+.mood-btn.active {
+    @apply bg-indigo-100 text-indigo-600;
+}
+
+/* Product Cards */
+.product-card {
+    @apply bg-white rounded-lg shadow-md overflow-hidden transition-all duration-200;
+}
+
+.product-card:hover {
+    @apply shadow-lg transform -translate-y-1;
+}
+
+.product-image {
+    @apply w-full h-48 object-cover;
+}
+
+.product-info {
+    @apply p-4;
+}
+
+.product-title {
+    @apply text-lg font-semibold mb-2;
+}
+
+.product-price {
+    @apply text-indigo-600 font-bold;
+}
+
+.match-score {
+    @apply inline-block px-2 py-1 rounded-full text-sm;
+}
+
+.match-score.high {
+    @apply bg-green-100 text-green-800;
+}
+
+.match-score.medium {
+    @apply bg-yellow-100 text-yellow-800;
+}
+
+.match-score.low {
+    @apply bg-red-100 text-red-800;
+}
+
+/* Chat Window */
+.chat-message {
+    @apply mb-4;
+}
+
+.chat-message.user {
+    @apply text-right;
+}
+
+.chat-message.assistant {
+    @apply text-left;
+}
+
+.chat-bubble {
+    @apply inline-block px-4 py-2 rounded-lg max-w-xs;
+}
+
+.chat-bubble.user {
+    @apply bg-indigo-600 text-white;
+}
+
+.chat-bubble.assistant {
+    @apply bg-gray-200 text-gray-800;
+}
+
+/* Voice Search */
+.voice-search-active {
+    @apply bg-red-600;
+}
+
+/* Loading States */
+.loading {
+    @apply animate-pulse;
+}
+
+/* Tooltips */
+.tooltip {
+    @apply invisible absolute;
+}
+
+.has-tooltip:hover .tooltip {
+    @apply visible z-50;
+}
+
+/* Responsive Design */
+@media (max-width: 640px) {
+    .product-grid {
+        @apply grid-cols-1;
+    }
+    
+    .chat-window {
+        @apply w-full h-full fixed inset-0;
+    }
+} 

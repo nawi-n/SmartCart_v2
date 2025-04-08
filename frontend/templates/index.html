@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartCart - Personalized Shopping Platform</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+</head>
+<body class="bg-gray-100">
+    <nav class="bg-white shadow-lg">
+        <div class="max-w-6xl mx-auto px-4">
+            <div class="flex justify-between">
+                <div class="flex space-x-7">
+                    <div>
+                        <a href="#" class="flex items-center py-4">
+                            <span class="font-semibold text-gray-500 text-lg">SmartCart</span>
+                        </a>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <a href="#" class="py-2 px-4 text-gray-500 hover:text-gray-900">Login</a>
+                    <a href="#" class="py-2 px-4 bg-blue-500 text-white rounded hover:bg-blue-600">Sign Up</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-6xl mx-auto px-4 py-8">
+        <div class="container mx-auto px-4 py-8">
+            <!-- User Insights Section -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <!-- Shopping Persona Card -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-xl font-semibold mb-4">Shopping Persona</h3>
+                    <div id="persona-content"></div>
+                    <div id="persona-collaborative" class="mt-4 text-sm text-gray-600"></div>
+                </div>
+                
+                <!-- Mood Card -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-xl font-semibold mb-4">Current Mood</h3>
+                    <div id="mood-content"></div>
+                    <div id="mood-collaborative" class="mt-4 text-sm text-gray-600"></div>
+                </div>
+                
+                <!-- Behavior Insights -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-xl font-semibold mb-4">Recent Activity</h3>
+                    <div id="behaviors-content"></div>
+                    <div id="behaviors-collaborative" class="mt-4 text-sm text-gray-600"></div>
+                </div>
+            </div>
+
+            <!-- Visualization Section -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <!-- Shopping Patterns Chart -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-xl font-semibold mb-4">Shopping Patterns</h3>
+                    <canvas id="shoppingPatternsChart"></canvas>
+                </div>
+                
+                <!-- Mood Trends Chart -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-xl font-semibold mb-4">Mood Trends</h3>
+                    <canvas id="moodTrendsChart"></canvas>
+                </div>
+                
+                <!-- Categories Distribution Chart -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-xl font-semibold mb-4">Product Categories</h3>
+                    <canvas id="categoriesChart"></canvas>
+                </div>
+                
+                <!-- Recommendation Performance Chart -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-xl font-semibold mb-4">Recommendation Performance</h3>
+                    <canvas id="recommendationsChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Interactive Features Section -->
+            <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+                <h3 class="text-xl font-semibold mb-4">Quick Actions</h3>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <button id="find-deals" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg">
+                        Find Deals
+                    </button>
+                    <button id="healthy-options" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg">
+                        Healthy Options
+                    </button>
+                    <button id="budget-friendly" class="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg">
+                        Budget Friendly
+                    </button>
+                    <button id="trending" class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg">
+                        Trending
+                    </button>
+                </div>
+            </div>
+
+            <!-- Shopping Lists Section -->
+            <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+                <h3 class="text-xl font-semibold mb-4">My Shopping Lists</h3>
+                <div id="shopping-lists" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+            </div>
+
+            <!-- Recommendations Section -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-xl font-semibold mb-4">Personalized Recommendations</h3>
+                <div id="recommendations" class="grid grid-cols-1 md:grid-cols-3 gap-4"></div>
+            </div>
+        </div>
+
+        <!-- Real-time Updates -->
+        <div id="real-time-updates" class="fixed bottom-4 right-4 bg-white rounded-lg shadow-md p-4 hidden">
+            <div class="flex justify-between items-center mb-2">
+                <h4 class="font-semibold">Updates</h4>
+                <button id="close-updates" class="text-gray-500 hover:text-gray-700">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <div id="update-content" class="text-sm"></div>
+        </div>
+    </main>
+
+    <script src="/static/js/main.js"></script>
+    <script src="/static/js/visualizations.js"></script>
+</body>
+</html> 
