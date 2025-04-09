@@ -10,6 +10,7 @@ from sqlalchemy.future import select
 from backend.app.models.models import User
 from backend.database.database import get_db
 from backend.app.core.config import settings
+from backend.app.schemas.schemas import UserResponse
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")

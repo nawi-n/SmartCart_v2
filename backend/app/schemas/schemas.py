@@ -10,12 +10,17 @@ class UserBase(BaseModel):
 class UserCreate(UserBase):
     password: str
 
-class User(UserBase):
+class UserResponse(UserBase):
     id: int
     is_active: bool = True
     preferences: Optional[dict] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+class User(UserResponse):
     shopping_lists: List['ShoppingList'] = []
     behaviors: List['Behavior'] = []
     mood_states: List['MoodState'] = []

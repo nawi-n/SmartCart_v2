@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, WebSocket
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy.orm import selectinload
 from typing import List, Dict
 from backend.database.database import get_db
 from backend.app.core.security import (
@@ -19,7 +20,8 @@ from backend.app.schemas.schemas import (
     PersonaCreate, Persona as PersonaSchema,
     RecommendationCreate, Recommendation as RecommendationSchema,
     Token, TokenData,
-    ShoppingPatterns, MoodTrends, CategoryDistribution, RecommendationPerformance
+    ShoppingPatterns, MoodTrends, CategoryDistribution, RecommendationPerformance,
+    UserResponse
 )
 from backend.app.services.genai_service import GenAIService
 from backend.app.services.agents import PersonaAgent, MoodAgent, BehaviorAgent, AgentCollaboration
@@ -69,14 +71,16 @@ async def login_for_access_token(
         )
 
 # User endpoints
-@router.post("/users/", response_model=UserSchema)
+@router.post("/users/", response_model=UserResponse)
 async def create_user(user: UserCreate, db: AsyncSession = Depends(get_db)):
     try:
+        # Check if user exists
         result = await db.execute(select(User).filter(User.email == user.email))
         db_user = result.scalars().first()
         if db_user:
             raise HTTPException(status_code=400, detail="Email already registered")
         
+        # Create new user
         hashed_password = get_password_hash(user.password)
         db_user = User(
             email=user.email,
@@ -86,10 +90,21 @@ async def create_user(user: UserCreate, db: AsyncSession = Depends(get_db)):
             is_active=True,
             preferences={}
         )
-        db.add(db_user)
-        await db.commit()
-        await db.refresh(db_user)
+        
+        try:
+            db.add(db_user)
+            await db.commit()
+            await db.refresh(db_user)
+        except Exception as commit_error:
+            await db.rollback()
+            raise HTTPException(
+                status_code=500,
+                detail=f"Database error while creating user: {str(commit_error)}"
+            )
+        
         return db_user
+    except HTTPException:
+        raise
     except Exception as e:
         await db.rollback()
         raise HTTPException(
@@ -97,8 +112,17 @@ async def create_user(user: UserCreate, db: AsyncSession = Depends(get_db)):
             detail=f"Error creating user: {str(e)}"
         )
 
-@router.get("/users/me/", response_model=UserSchema)
-async def read_users_me(current_user: UserSchema = Depends(get_current_active_user)):
+@router.get("/users/me/", response_model=UserResponse)
+async def read_users_me(current_user: User = Depends(get_current_active_user)):
+    # Initialize empty lists for relationships if they don't exist
+    if not hasattr(current_user, 'shopping_lists'):
+        current_user.shopping_lists = []
+    if not hasattr(current_user, 'behaviors'):
+        current_user.behaviors = []
+    if not hasattr(current_user, 'mood_states'):
+        current_user.mood_states = []
+    if not hasattr(current_user, 'personas'):
+        current_user.personas = []
     return current_user
 
 # Product endpoints
@@ -143,45 +167,156 @@ async def read_product(
 @router.post("/shopping-lists/", response_model=ShoppingListSchema)
 async def create_shopping_list(
     shopping_list: ShoppingListCreate,
-    current_user: UserSchema = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db)
 ):
-    db_shopping_list = ShoppingList(**shopping_list.dict(), user_id=current_user.id)
-    db.add(db_shopping_list)
-    await db.commit()
-    await db.refresh(db_shopping_list)
-    return db_shopping_list
+    try:
+        db_shopping_list = ShoppingList(**shopping_list.dict(), user_id=current_user.id)
+        db.add(db_shopping_list)
+        await db.commit()
+        await db.refresh(db_shopping_list)
+        
+        # Return a fresh query with relationships loaded
+        query = select(ShoppingList).where(
+            ShoppingList.id == db_shopping_list.id
+        ).options(
+            selectinload(ShoppingList.items)
+        )
+        result = await db.execute(query)
+        return result.scalars().first()
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error creating shopping list: {str(e)}"
+        )
 
 @router.get("/shopping-lists/", response_model=List[ShoppingListSchema])
-async def read_shopping_lists(
-    current_user: UserSchema = Depends(get_current_active_user),
+async def get_shopping_lists(
+    current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db)
 ):
-    result = await db.execute(select(ShoppingList).filter(ShoppingList.user_id == current_user.id))
-    shopping_lists = result.scalars().all()
-    return shopping_lists
+    try:
+        query = select(ShoppingList).filter(
+            ShoppingList.user_id == current_user.id
+        ).options(
+            selectinload(ShoppingList.items).selectinload(ShoppingListItem.product)
+        ).order_by(ShoppingList.created_at.desc())
+        
+        result = await db.execute(query)
+        shopping_lists = result.scalars().all()
+        return shopping_lists
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error fetching shopping lists: {str(e)}"
+        )
 
-@router.post("/shopping-lists/{shopping_list_id}/items/", response_model=ShoppingListItemSchema)
-async def add_shopping_list_item(
-    shopping_list_id: int,
+@router.post("/shopping-lists/{list_id}/items/", response_model=ShoppingListItemSchema)
+async def add_item_to_shopping_list(
+    list_id: int,
     item: ShoppingListItemCreate,
-    current_user: UserSchema = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db)
 ):
-    # Track add to list behavior
-    behavior = Behavior(
-        user_id=current_user.id,
-        product_id=item.product_id,
-        action_type="add_to_list",
-        context={"shopping_list_id": shopping_list_id}
-    )
-    db.add(behavior)
-    
-    db_item = ShoppingListItem(**item.dict(), shopping_list_id=shopping_list_id)
-    db.add(db_item)
-    await db.commit()
-    await db.refresh(db_item)
-    return db_item
+    try:
+        # Verify shopping list exists and belongs to user
+        query = select(ShoppingList).filter(
+            ShoppingList.id == list_id,
+            ShoppingList.user_id == current_user.id
+        )
+        result = await db.execute(query)
+        shopping_list = result.scalars().first()
+        if not shopping_list:
+            raise HTTPException(status_code=404, detail="Shopping list not found")
+
+        # Create new item
+        db_item = ShoppingListItem(
+            shopping_list_id=list_id,
+            product_id=item.product_id,
+            quantity=item.quantity
+        )
+        db.add(db_item)
+        await db.commit()
+        await db.refresh(db_item)
+        
+        # Return a fresh query with relationships loaded
+        query = select(ShoppingListItem).filter(
+            ShoppingListItem.id == db_item.id
+        ).options(
+            selectinload(ShoppingListItem.product)
+        )
+        result = await db.execute(query)
+        return result.scalars().first()
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error adding item to shopping list: {str(e)}"
+        )
+
+@router.get("/shopping-lists/{list_id}/analysis")
+async def analyze_shopping_list(
+    list_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    try:
+        # Get shopping list with items and products loaded
+        query = select(ShoppingList).filter(
+            ShoppingList.id == list_id,
+            ShoppingList.user_id == current_user.id
+        ).options(
+            selectinload(ShoppingList.items).selectinload(ShoppingListItem.product)
+        )
+        result = await db.execute(query)
+        shopping_list = result.scalars().first()
+        
+        if not shopping_list:
+            raise HTTPException(status_code=404, detail="Shopping list not found")
+        
+        items_data = [
+            {
+                "name": item.product.name,
+                "quantity": item.quantity,
+                "price": item.product.price
+            }
+            for item in shopping_list.items
+        ]
+        
+        # Get user persona and mood with proper loading
+        persona_query = select(Persona).filter(
+            Persona.user_id == current_user.id
+        )
+        persona_result = await db.execute(persona_query)
+        persona = persona_result.scalars().first()
+        
+        mood_query = select(MoodState).filter(
+            MoodState.user_id == current_user.id
+        ).order_by(MoodState.created_at.desc())
+        mood_result = await db.execute(mood_query)
+        mood = mood_result.scalars().first()
+        
+        collaboration_context = {
+            'persona': persona.__dict__ if persona else {},
+            'mood': mood.__dict__ if mood else {},
+            'shopping_list': items_data
+        }
+        
+        collaborative_insights = await agent_collaboration.make_decision(collaboration_context)
+        analysis = await genai_service.analyze_shopping_list(items_data)
+        analysis['collaborative_insights'] = collaborative_insights
+        
+        return analysis
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error analyzing shopping list: {str(e)}"
+        )
 
 # WebSocket for real-time updates
 @router.websocket("/ws/updates")
@@ -272,45 +407,6 @@ async def get_recommendations(
         rec.insights = collaborative_insights
     
     return recommendations
-
-# Enhanced shopping list analysis
-@router.get("/shopping-lists/{shopping_list_id}/analysis")
-async def analyze_shopping_list(
-    shopping_list_id: int,
-    current_user: UserSchema = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_db)
-):
-    items = await db.execute(select(ShoppingListItem).filter(ShoppingListItem.shopping_list_id == shopping_list_id))
-    items_data = [
-        {
-            "name": item.product.name,
-            "quantity": item.quantity,
-            "price": item.product.price
-        }
-        for item in items.scalars().all()
-    ]
-    
-    # Get collaborative insights
-    persona = await db.execute(select(Persona).filter(Persona.user_id == current_user.id))
-    persona = persona.scalars().first()
-    
-    mood = await db.execute(select(MoodState).filter(
-        MoodState.user_id == current_user.id
-    ).order_by(MoodState.created_at.desc()))
-    mood = mood.scalars().first()
-    
-    collaboration_context = {
-        'persona': persona.__dict__ if persona else {},
-        'mood': mood.__dict__ if mood else {},
-        'shopping_list': items_data
-    }
-    
-    collaborative_insights = await agent_collaboration.make_decision(collaboration_context)
-    
-    analysis = await genai_service.analyze_shopping_list(items_data)
-    analysis['collaborative_insights'] = collaborative_insights
-    
-    return analysis
 
 # Agent-specific endpoints
 @router.get("/users/me/persona")
@@ -406,35 +502,49 @@ async def get_mood_trends(
 
 @router.get("/analytics/categories")
 async def get_categories_distribution(
-    current_user: UserSchema = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db)
 ):
-    # Get all products in user's shopping lists
-    shopping_list_items = await db.execute(select(ShoppingListItem).join(
-        ShoppingList
-    ).filter(
-        ShoppingList.user_id == current_user.id
-    ))
-    
-    # Count products by category
-    category_counts = {}
-    for item in shopping_list_items.scalars().all():
-        category = item.product.category
-        if category not in category_counts:
-            category_counts[category] = 0
-        category_counts[category] += 1
-    
-    # Format data for chart
-    categories = []
-    counts = []
-    for category, count in category_counts.items():
-        categories.append(category)
-        counts.append(count)
-    
-    return {
-        "categories": categories,
-        "counts": counts
-    }
+    try:
+        # Get all shopping lists for the user with items and products loaded
+        query = select(ShoppingList).filter(
+            ShoppingList.user_id == current_user.id
+        ).options(
+            selectinload(ShoppingList.items).selectinload(ShoppingListItem.product)
+        )
+        result = await db.execute(query)
+        shopping_lists = result.scalars().all()
+
+        # Calculate category distribution
+        category_counts = {}
+        total_items = 0
+
+        for shopping_list in shopping_lists:
+            for item in shopping_list.items:
+                if item.product and item.product.category:
+                    category = item.product.category
+                    quantity = item.quantity or 1
+                    category_counts[category] = category_counts.get(category, 0) + quantity
+                    total_items += quantity
+
+        # Calculate percentages
+        distribution = {
+            category: {
+                'count': count,
+                'percentage': (count / total_items * 100) if total_items > 0 else 0
+            }
+            for category, count in category_counts.items()
+        }
+
+        return {
+            'total_items': total_items,
+            'distribution': distribution
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error calculating categories distribution: {str(e)}"
+        )
 
 @router.get("/analytics/recommendations")
 async def get_recommendation_performance(

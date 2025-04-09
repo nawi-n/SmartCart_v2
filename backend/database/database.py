@@ -1,6 +1,6 @@
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.pool import StaticPool
 import os
 from dotenv import load_dotenv
 import aiosqlite
@@ -15,26 +15,24 @@ DATABASE_PATH = os.path.join(BASE_DIR, "smartcart.db")
 # Use database URL with absolute path
 SQLALCHEMY_DATABASE_URL = f"sqlite+aiosqlite:///{DATABASE_PATH}"
 
-# Create async engine with aiosqlite
+# Create async engine
 engine = create_async_engine(
     SQLALCHEMY_DATABASE_URL,
+    connect_args={"check_same_thread": False},
+    poolclass=StaticPool,
     echo=settings.DEBUG,
-    future=True,
-    connect_args={"check_same_thread": False}
 )
 
-# Create async session factory
-AsyncSessionLocal = sessionmaker(
-    engine,
-    class_=AsyncSession,
-    expire_on_commit=False
+# Create session factory
+async_session = sessionmaker(
+    engine, expire_on_commit=False, class_=AsyncSession
 )
 
 Base = declarative_base()
 
-# Dependency to get async database session
+# Dependency for database session
 async def get_db():
-    async with AsyncSessionLocal() as session:
+    async with async_session() as session:
         try:
             yield session
             await session.commit()
