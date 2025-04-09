@@ -113,17 +113,21 @@ async def create_user(user: UserCreate, db: AsyncSession = Depends(get_db)):
         )
 
 @router.get("/users/me/", response_model=UserResponse)
-async def read_users_me(current_user: User = Depends(get_current_active_user)):
-    # Initialize empty lists for relationships if they don't exist
-    if not hasattr(current_user, 'shopping_lists'):
-        current_user.shopping_lists = []
-    if not hasattr(current_user, 'behaviors'):
-        current_user.behaviors = []
-    if not hasattr(current_user, 'mood_states'):
-        current_user.mood_states = []
-    if not hasattr(current_user, 'personas'):
-        current_user.personas = []
-    return current_user
+async def read_users_me(
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    # Load all relationships for the current user
+    query = select(User).where(User.id == current_user.id).options(
+        selectinload(User.shopping_lists),
+        selectinload(User.behaviors),
+        selectinload(User.mood_states),
+        selectinload(User.personas),
+        selectinload(User.recommendations)
+    )
+    result = await db.execute(query)
+    user = result.scalars().first()
+    return user
 
 # Product endpoints
 @router.post("/products/", response_model=ProductSchema)
