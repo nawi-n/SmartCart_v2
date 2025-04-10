@@ -2,6 +2,57 @@
 
 SmartCart is a modern shopping platform that uses Generative AI to provide personalized product recommendations and shopping list management.
 
+## Project Structure
+
+```
+SmartCart_v2/
+├── backend/                    # Backend FastAPI application
+│   ├── app/                    # Application code
+│   │   ├── api/               # API endpoints
+│   │   │   ├── endpoints/     # Route handlers
+│   │   │   └── __init__.py
+│   │   ├── core/              # Core functionality
+│   │   │   ├── auth.py        # Authentication
+│   │   │   ├── config.py      # Configuration
+│   │   │   └── __init__.py
+│   │   ├── models/            # Database models
+│   │   │   ├── models.py
+│   │   │   └── __init__.py
+│   │   ├── schemas/           # Pydantic schemas
+│   │   │   ├── schemas.py
+│   │   │   └── __init__.py
+│   │   ├── services/          # Business logic
+│   │   │   ├── genai_service.py
+│   │   │   ├── agents.py
+│   │   │   └── __init__.py
+│   │   ├── database/          # Database configuration
+│   │   │   ├── database.py
+│   │   │   └── __init__.py
+│   │   └── main.py            # FastAPI application
+│   ├── tests/                 # Backend tests
+│   │   ├── __init__.py
+│   │   ├── test_api.py
+│   │   └── test_endpoints.py
+│   ├── alembic/               # Database migrations
+│   ├── alembic.ini
+│   └── requirements.txt       # Python dependencies
+├── frontend/                  # Frontend React application
+│   ├── src/                  # Source code
+│   │   ├── components/       # React components
+│   │   ├── pages/           # Page components
+│   │   ├── services/        # API services
+│   │   ├── utils/           # Utility functions
+│   │   └── App.jsx          # Main application
+│   ├── public/              # Static files
+│   ├── package.json         # Node.js dependencies
+│   └── vite.config.js       # Vite configuration
+├── data/                    # Data files
+│   ├── product_recommendation_data.csv
+│   └── customer_data_collection.csv
+├── .env                     # Environment variables
+└── .gitignore              # Git ignore rules
+```
+
 ## Features
 
 - User authentication and profile management
@@ -9,13 +60,15 @@ SmartCart is a modern shopping platform that uses Generative AI to provide perso
 - Shopping list creation and management
 - Product browsing and search
 - Smart shopping list analysis
+- Real-time updates and notifications
 
 ## Tech Stack
 
 - Backend: FastAPI, SQLAlchemy, SQLite
-- Frontend: HTML, CSS (Tailwind), JavaScript
+- Frontend: React, Vite, Tailwind CSS
 - AI: Google Generative AI
 - Authentication: JWT
+- Database: SQLite with Alembic migrations
 
 ## Setup Instructions
 
@@ -25,15 +78,18 @@ git clone https://github.com/yourusername/SmartCart_v2.git
 cd SmartCart_v2
 ```
 
-2. Create and activate a virtual environment:
+2. Set up the backend:
 ```bash
+cd backend
 python -m venv venv
 source venv/bin/activate  # On Windows: .\venv\Scripts\activate
+pip install -r requirements.txt
 ```
 
-3. Install dependencies:
+3. Set up the frontend:
 ```bash
-pip install -r requirements.txt
+cd ../frontend
+npm install
 ```
 
 4. Set up environment variables:
@@ -45,18 +101,25 @@ pip install -r requirements.txt
 
 5. Initialize the database:
 ```bash
-python -m backend.app.main
+cd ../backend
+alembic upgrade head
 ```
 
-6. Start the development server:
+6. Start the development servers:
 ```bash
-uvicorn backend.app.main:app --reload
+# Terminal 1 - Backend
+cd backend
+uvicorn app.main:app --reload
+
+# Terminal 2 - Frontend
+cd frontend
+npm run dev
 ```
 
 7. Access the application:
 - API: http://localhost:8000
 - API Documentation: http://localhost:8000/docs
-- Frontend: http://localhost:8000/static
+- Frontend: http://localhost:3000
 
 ## API Endpoints
 
