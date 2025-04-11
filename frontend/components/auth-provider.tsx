@@ -79,12 +79,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const userData = await response.json()
         setUser(userData)
 
-        // Generate persona if not exists, but only after user is set
+        // Check if persona generation is needed
         if (!userData.personas || userData.personas.length === 0) {
-          // Wait a bit to ensure user state is updated
-          setTimeout(() => {
-            generatePersona()
-          }, 100)
+          // Use the userData directly instead of waiting for state update
+          await generatePersona(userData.id)
         }
       } else {
         // Token might be invalid
@@ -102,11 +100,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const generatePersona = async () => {
+  const generatePersona = async (userId: number) => {
     try {
-      // Ensure we have both user and token
-      if (!user?.id || !token) {
-        console.error("User ID or token not available for persona generation")
+      if (!token) {
+        console.error("Token not available for persona generation")
         return
       }
 
@@ -116,7 +113,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ user_id: user.id }),
+        body: JSON.stringify({ user_id: userId }),
       })
 
       if (!response.ok) {
