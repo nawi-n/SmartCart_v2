@@ -652,4 +652,44 @@ async def get_mood_history(
         MoodState.user_id == current_user.id
     ).order_by(MoodState.created_at.desc()))
     moods = result.scalars().all()
-    return moods 
+    return moods
+
+@router.post("/users/me/persona")
+async def generate_persona(
+    request: dict,
+    current_user: UserSchema = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Generate a new persona for the current user.
+    """
+    try:
+        # Check if user already has a persona
+        result = await db.execute(select(Persona).filter(Persona.user_id == current_user.id))
+        existing_persona = result.scalars().first()
+        
+        if existing_persona:
+            # Update existing persona
+            persona_data = await persona_agent.analyze_user(current_user, [])
+            for key, value in persona_data.items():
+                setattr(existing_persona, key, value)
+            await db.commit()
+            return existing_persona
+        
+        # Create new persona
+        persona_data = await persona_agent.analyze_user(current_user, [])
+        new_persona = Persona(
+            user_id=current_user.id,
+            **persona_data
+        )
+        db.add(new_persona)
+        await db.commit()
+        await db.refresh(new_persona)
+        
+        return new_persona
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error generating persona: {str(e)}"
+        ) 
